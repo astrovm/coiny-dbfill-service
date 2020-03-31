@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
@@ -119,13 +118,10 @@ func getUrls() {
 	log.Println("main exit")
 }
 
-func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func handler() (string, error) {
 	getUrls()
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Body:       "done.",
-	}, nil
+	return "done", nil
 }
 
 func main() {
