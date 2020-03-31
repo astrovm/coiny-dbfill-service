@@ -11,8 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 
-	"os"
-
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
@@ -29,8 +27,6 @@ func dbFill(url string, wg *sync.WaitGroup) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	log.Println(string(body))
 
 	type Item struct {
 		URL  string
@@ -51,9 +47,8 @@ func dbFill(url string, wg *sync.WaitGroup) {
 
 	av, err := dynamodbattribute.MarshalMap(item)
 	if err != nil {
-		log.Println("got error marshalling new url item:")
-		log.Println(err.Error())
-		os.Exit(1)
+		log.Println("got error marshalling new URL item:")
+		log.Fatalln(err.Error())
 	}
 
 	tableName := "coiny-apis-data"
@@ -66,8 +61,7 @@ func dbFill(url string, wg *sync.WaitGroup) {
 	_, err = svc.PutItem(input)
 	if err != nil {
 		log.Println("got error calling PutItem:")
-		log.Println(err.Error())
-		os.Exit(1)
+		log.Fatalln(err.Error())
 	}
 
 	log.Println("successfully added '" + item.URL + "' to table " + tableName)
@@ -101,7 +95,8 @@ func getUrls() {
 		"https://api.pro.coinbase.com/products/eth-btc/ticker",
 		"https://api.pro.coinbase.com/products/ltc-btc/ticker",
 		"https://api.pro.coinbase.com/products/xrp-btc/ticker",
-		"https://api.pro.coinbase.com/products/xlm-btc/ticker"}
+		"https://api.pro.coinbase.com/products/xlm-btc/ticker",
+	}
 
 	urlsLength := len(urls)
 
