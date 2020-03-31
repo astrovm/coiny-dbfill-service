@@ -6,6 +6,13 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+
+	"os"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
@@ -24,6 +31,46 @@ func dbFill(url string, wg *sync.WaitGroup) {
 	}
 
 	log.Println(string(body))
+
+	type Item struct {
+		URL  string
+		Body string
+	}
+
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+
+	// create dynamoDB client
+	svc := dynamodb.New(sess)
+
+	item := Item{
+		URL:  string(url),
+		Body: string(body),
+	}
+
+	av, err := dynamodbattribute.MarshalMap(item)
+	if err != nil {
+		log.Println("got error marshalling new url item:")
+		log.Println(err.Error())
+		os.Exit(1)
+	}
+
+	tableName := "coiny-apis-data"
+
+	input := &dynamodb.PutItemInput{
+		Item:      av,
+		TableName: aws.String(tableName),
+	}
+
+	_, err = svc.PutItem(input)
+	if err != nil {
+		log.Println("got error calling PutItem:")
+		log.Println(err.Error())
+		os.Exit(1)
+	}
+
+	log.Println("successfully added '" + item.URL + "' to table " + tableName)
 
 	log.Println("goroutine exit")
 }
