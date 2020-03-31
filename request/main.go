@@ -1,11 +1,13 @@
 package main
 
 import (
-	"net/http"
-	"log"
 	"io/ioutil"
-	"fmt"
+	"log"
+	"net/http"
 	"sync"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 )
 
 func dbFill(url string, wg *sync.WaitGroup) {
@@ -23,10 +25,10 @@ func dbFill(url string, wg *sync.WaitGroup) {
 
 	log.Println(string(body))
 
-	fmt.Println("goroutine exit")
+	log.Println("goroutine exit")
 }
 
-func main() {
+func getUrls() {
 	urls := []string{
 		"https://blockstream.info/api/fee-estimates",
 		"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&&vs_currencies=usd",
@@ -66,5 +68,18 @@ func main() {
 
 	wg.Wait()
 
-	fmt.Println("main goroutine exit")
+	log.Println("main exit")
+}
+
+func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	getUrls()
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Body:       "done.",
+	}, nil
+}
+
+func main() {
+	lambda.Start(handler)
 }
