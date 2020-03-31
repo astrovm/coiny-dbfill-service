@@ -20,12 +20,16 @@ func dbFill(url string, wg *sync.WaitGroup) {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println("got error getting url:")
+		log.Println(err)
+		return
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println("got error reading response body:")
+		log.Println(err)
+		return
 	}
 
 	type Item struct {
@@ -48,7 +52,8 @@ func dbFill(url string, wg *sync.WaitGroup) {
 	av, err := dynamodbattribute.MarshalMap(item)
 	if err != nil {
 		log.Println("got error marshalling new URL item:")
-		log.Fatalln(err.Error())
+		log.Println(err)
+		return
 	}
 
 	tableName := "coiny-apis-data"
@@ -61,7 +66,8 @@ func dbFill(url string, wg *sync.WaitGroup) {
 	_, err = svc.PutItem(input)
 	if err != nil {
 		log.Println("got error calling PutItem:")
-		log.Fatalln(err.Error())
+		log.Println(err)
+		return
 	}
 
 	log.Println("successfully added '" + item.URL + "' to table " + tableName)
