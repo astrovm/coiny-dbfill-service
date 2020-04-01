@@ -28,16 +28,7 @@ func getURLData(url string) (string, error) {
 	return string(body), nil
 }
 
-func dbFillWithURLData(url string, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	body, err := getURLData(url)
-	if err != nil {
-		log.Println(body)
-		log.Println(err)
-		return
-	}
-
+func dbFillWithURLData(url string, body string) (string, error) {
 	type Item struct {
 		URL  string
 		Body string
@@ -56,9 +47,7 @@ func dbFillWithURLData(url string, wg *sync.WaitGroup) {
 
 	av, err := dynamodbattribute.MarshalMap(itemToAddtoDB)
 	if err != nil {
-		log.Println("got error marshalling new URL item:")
-		log.Println(err)
-		return
+		return "got error marshalling new URL item:", err
 	}
 
 	tableName := "coiny-apis-data"
@@ -70,12 +59,30 @@ func dbFillWithURLData(url string, wg *sync.WaitGroup) {
 
 	_, err = svc.PutItem(input)
 	if err != nil {
-		log.Println("got error calling PutItem:")
+		return "got error calling PutItem:", err
+	}
+
+	return "successfully added '" + itemToAddtoDB.URL + "' to table " + tableName, nil
+}
+
+func getAndSave(url string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	body, err := getURLData(url)
+	if err != nil {
+		log.Println(body)
 		log.Println(err)
 		return
 	}
 
-	log.Println("successfully added '" + itemToAddtoDB.URL + "' to table " + tableName)
+	res, err := dbFillWithURLData(url, body)
+	if err != nil {
+		log.Println(res)
+		log.Println(err)
+		return
+	}
+
+	log.Println(res)
 }
 
 func triggerURLsGets() {
@@ -114,7 +121,7 @@ func triggerURLsGets() {
 	wg.Add(urlsLength)
 
 	for i := 0; i < urlsLength; i++ {
-		go dbFillWithURLData(urlsArray[i], &wg)
+		go getAndSave(urlsArray[i], &wg)
 	}
 
 	wg.Wait()
