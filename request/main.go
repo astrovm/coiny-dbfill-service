@@ -14,19 +14,26 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-func dbFill(url string, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func getURLData(url string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Println("got error getting url:")
-		log.Println(err)
-		return
+		return "got error getting url:", err
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("got error reading response body:")
+		return "got error reading response body:", err
+	}
+
+	return string(body), nil
+}
+
+func dbFillWithURLData(url string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	body, err := getURLData(url)
+	if err != nil {
+		log.Println(body)
 		log.Println(err)
 		return
 	}
@@ -36,19 +43,18 @@ func dbFill(url string, wg *sync.WaitGroup) {
 		Body string
 	}
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-
-	// create dynamoDB client
-	svc := dynamodb.New(sess)
-
-	item := Item{
+	itemToAddtoDB := Item{
 		URL:  string(url),
 		Body: string(body),
 	}
 
-	av, err := dynamodbattribute.MarshalMap(item)
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+
+	svc := dynamodb.New(sess)
+
+	av, err := dynamodbattribute.MarshalMap(itemToAddtoDB)
 	if err != nil {
 		log.Println("got error marshalling new URL item:")
 		log.Println(err)
@@ -69,13 +75,11 @@ func dbFill(url string, wg *sync.WaitGroup) {
 		return
 	}
 
-	log.Println("successfully added '" + item.URL + "' to table " + tableName)
-
-	log.Println("goroutine exit")
+	log.Println("successfully added '" + itemToAddtoDB.URL + "' to table " + tableName)
 }
 
-func getUrls() {
-	urls := []string{
+func triggerURLsGets() {
+	urlsArray := []string{
 		"https://blockstream.info/api/fee-estimates",
 		"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&&vs_currencies=usd",
 		"https://blockstream.info/api/blocks/tip/height",
@@ -103,23 +107,21 @@ func getUrls() {
 		"https://api.pro.coinbase.com/products/xlm-btc/ticker",
 	}
 
-	urlsLength := len(urls)
+	urlsLength := len(urlsArray)
 
 	var wg sync.WaitGroup
 
 	wg.Add(urlsLength)
 
 	for i := 0; i < urlsLength; i++ {
-		go dbFill(urls[i], &wg)
+		go dbFillWithURLData(urlsArray[i], &wg)
 	}
 
 	wg.Wait()
-
-	log.Println("main exit")
 }
 
 func handler() (string, error) {
-	getUrls()
+	triggerURLsGets()
 
 	return "done", nil
 }
