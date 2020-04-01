@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -67,6 +68,11 @@ func dbFillWithURLData(url string, body string) (string, error) {
 
 func getAndSave(url string, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	// some external apis we call have rate limits, so we sleep for 1 sec to respect them
+	if url == "https://api.pro.coinbase.com/products/xrp-btc/ticker" {
+		time.Sleep(1 * time.Second)
+	}
 
 	body, err := getURLData(url)
 	if err != nil {
