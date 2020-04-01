@@ -31,13 +31,15 @@ func getURLData(url string) (string, error) {
 
 func dbFillWithURLData(url string, body string) (string, error) {
 	type Item struct {
-		URL  string
-		Body string
+		URL       string
+		Body      string
+		UpdatedAt string
 	}
 
 	itemToAddtoDB := Item{
-		URL:  string(url),
-		Body: string(body),
+		URL:       string(url),
+		Body:      string(body),
+		UpdatedAt: time.Now().String(),
 	}
 
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
