@@ -1,74 +1,35 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-
-	"github.com/aws/aws-lambda-go/lambda"
 )
 
-func getURLData(url string) (string, error) {
-	resp, err := http.Get(url)
+func getURLData(url string) (map[string]interface{}, error) {
+	response, err := http.Get(url)
 	if err != nil {
-		return "got error getting url:", err
+		return nil, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	readResponse, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return "got error reading response body:", err
+		return nil, err
 	}
 
-	return string(body), nil
+	var body map[string]interface{}
+
+	json.Unmarshal([]byte(readResponse), &body)
+
+	return body, nil
 }
 
-func dbFillWithURLData(url string, body string) (string, error) {
-	type Item struct {
-		URL       string
-		Body      string
-		UpdatedAt string
-	}
-
-	itemToAddtoDB := Item{
-		URL:       string(url),
-		Body:      string(body),
-		UpdatedAt: time.Now().String(),
-	}
-
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-
-	svc := dynamodb.New(sess)
-
-	av, err := dynamodbattribute.MarshalMap(itemToAddtoDB)
-	if err != nil {
-		return "got error marshalling new URL item:", err
-	}
-
-	tableName := "coiny-apis-data"
-
-	input := &dynamodb.PutItemInput{
-		Item:      av,
-		TableName: aws.String(tableName),
-	}
-
-	_, err = svc.PutItem(input)
-	if err != nil {
-		return "got error calling PutItem:", err
-	}
-
-	return "successfully added '" + itemToAddtoDB.URL + "' to table " + tableName, nil
-}
-
-func getAndSave(url string, wg *sync.WaitGroup) {
+func getAndSave(url string, cache map[string]interface{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// some external apis we call have rate limits, so we sleep for 1 sec to respect them
@@ -83,17 +44,10 @@ func getAndSave(url string, wg *sync.WaitGroup) {
 		return
 	}
 
-	res, err := dbFillWithURLData(url, body)
-	if err != nil {
-		log.Println(res)
-		log.Println(err)
-		return
-	}
-
-	log.Println(res)
+	cache[url] = body
 }
 
-func triggerURLsGets() {
+func triggerURLsGets(cache *map[string]interface{}) {
 	urlsArray := []string{
 		"https://api.bitso.com/v3/ticker",
 		"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&&vs_currencies=usd",
@@ -129,18 +83,22 @@ func triggerURLsGets() {
 	wg.Add(urlsLength)
 
 	for i := 0; i < urlsLength; i++ {
-		go getAndSave(urlsArray[i], &wg)
+		go getAndSave(urlsArray[i], *cache, &wg)
 	}
 
 	wg.Wait()
 }
 
-func handler() (string, error) {
-	triggerURLsGets()
-
-	return "done", nil
-}
-
 func main() {
-	lambda.Start(handler)
+	cache := make(map[string]interface{})
+
+	go triggerURLsGets(&cache)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello, %q", html.EscapeString("asd"))
+		log.Println(cache)
+	})
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
+
 }
